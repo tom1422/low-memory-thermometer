@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#define readingtimeout 1000
+#define readingtimeout 600
 
 #include <displayconversion.h>
 #include <i2csensor.h>
