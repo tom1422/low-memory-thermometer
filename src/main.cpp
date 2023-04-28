@@ -56,6 +56,8 @@ void loop() {
   disp_cursorMove(49);
   disp_writeNumericalString(fracHumidityText, 4);
 
+  disp_resetCursor();
+
   // Serial.println(wholeHumidityText);
   // Serial.println(fracHumidityText);
 }

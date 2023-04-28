@@ -1,7 +1,9 @@
 #pragma once
 #include <Arduino.h>
 
-#define delayus 2500
+#define delayus_fast    45      //Used for fast 8 bit command execution speed
+#define delayus_slow    1620    //Used for slow 8 bit command execution speed
+#define delayus_cmd     50      //Used for first 4 bit transmission speed
 #define RS 3
 #define E  4
 #define D4 5
@@ -12,9 +14,10 @@
 unsigned int cursorPosition = 0; //Max: 80. 0 to 39 represents first line and 40 to 79 represent second line
 
 void disp_cursorMove(unsigned int location);
+void disp_resetCursor();
 void disp_run8BitCommand(byte cmd);
 void disp_run8BitCommand_RS(byte cmd);
-void disp_run4BitCommand(byte cmd);
+void disp_run4BitCommand(byte cmd, unsigned int execTime);
 void disp_clockDown();
 void disp_clockUp();
 void disp_writeNumericalString(char* characters, int bluff);
@@ -30,13 +33,13 @@ void disp_setup() {
 
     delay(100);
 
-    //Run 3 commands to put in 8 bit mode
-    disp_run4BitCommand(0b00000011);
-    disp_run4BitCommand(0b00000011);
-    disp_run4BitCommand(0b00000011);
+    //Run 3 FUNCTION SET commands to put in 8 bit mode
+    disp_run4BitCommand(0b00000011, delayus_slow);
+    disp_run4BitCommand(0b00000011, delayus_slow);
+    disp_run4BitCommand(0b00000011, delayus_slow);
 
     //Put back in 4 bit mode (0b0010)
-    disp_run4BitCommand(0b00000010);
+    disp_run4BitCommand(0b00000010, delayus_slow);
 
     //Set to 4 bit mode and 2 line
     disp_run8BitCommand(0b00101000);
@@ -100,19 +103,20 @@ void disp_cursorMove(unsigned int location) {
     // Serial.println(cursorPosition);
 }
 
+void disp_resetCursor() {
+    cursorPosition = 0;
+    //Home cursor !SLOW COMMAND!
+    disp_run8BitCommand(0b00000010);
+}
+
 void disp_run8BitCommand(byte cmd) {
-    disp_clockDown();
-    digitalWrite(D7, bitRead(cmd, 7));
-    digitalWrite(D6, bitRead(cmd, 6));
-    digitalWrite(D5, bitRead(cmd, 5));
-    digitalWrite(D4, bitRead(cmd, 4));
-    disp_clockUp();
-    disp_clockDown();
-    digitalWrite(D7, bitRead(cmd, 3));
-    digitalWrite(D6, bitRead(cmd, 2));
-    digitalWrite(D5, bitRead(cmd, 1));
-    digitalWrite(D4, bitRead(cmd, 0));
-    disp_clockUp();
+    disp_run4BitCommand(cmd>>4, delayus_cmd);
+    //All commands take ~37us apart from 0b00000001 and 0b0000001X which take ~1520us
+    if ((cmd == 0x01) || ((cmd & 0xFE) == 0x02)) {
+        disp_run4BitCommand(cmd, delayus_slow);
+    } else {
+        disp_run4BitCommand(cmd, delayus_fast);
+    }
 }
 
 void disp_run8BitCommand_RS(byte cmd) {
@@ -124,22 +128,21 @@ void disp_run8BitCommand_RS(byte cmd) {
     // Serial.println(cursorPosition);
 }
 
-void disp_run4BitCommand(byte cmd) {
+void disp_run4BitCommand(byte cmd, unsigned int execTime) {
     disp_clockDown();
     digitalWrite(D7, bitRead(cmd, 3));
     digitalWrite(D6, bitRead(cmd, 2));
     digitalWrite(D5, bitRead(cmd, 1));
     digitalWrite(D4, bitRead(cmd, 0));
     disp_clockUp();
+    delayMicroseconds(execTime);
 }
 
 void disp_clockDown() {
-    delayMicroseconds(delayus);
     digitalWrite(E, HIGH);
 }
 
 void disp_clockUp() {
-    delayMicroseconds(delayus);
     digitalWrite(E, LOW);
 }
 
